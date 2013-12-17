@@ -17,9 +17,9 @@ import (
 )
 
 /*
- * Structure describing one or more control groups. The structure is opaque to
- * applications.
- */
+Structure describing one or more control groups. The structure is opaque to
+applications.
+*/
 type Cgroup struct {
 	g *C.struct_group
 }
@@ -28,7 +28,7 @@ func NewCgroup(name string) Cgroup {
 	cg := Cgroup{
 		C.cgroup_new_cgroup(C.CString(name)),
 	}
-	runtime.SetFinalizer(cg, freeCgroup)
+	runtime.SetFinalizer(cg, freeCgroupThings)
 	return cg
 }
 
@@ -43,38 +43,65 @@ func (cg Cgroup) GetController(name string) Controller {
 	}
 }
 
+func freeCgroupThings(cg Cgroup) {
+  freeCgroup(cg)
+  freeControllers(cg)
+}
+
 func freeCgroup(cg Cgroup) {
 	C.cgroup_free(&cg.g)
 }
 
+func freeControllers(cg Cgroup) {
+	C.cgroup_free_controllers(cg.g)
+}
+
 /*
- * Structure describing a controller attached to one struct @c cgroup, including
- * parameters of the group and their values. The structure is opaque to
- * applications.
- */
+Physically create a control group in kernel. The group is created in all
+hierarchies, which cover controllers added by Cgroup.AddController().
+
+TODO correct docs for golang implementation
+
+All parameters set by cgroup_add_value_* functions are written.
+The created groups has owner which was set by cgroup_set_uid_gid() and
+permissions set by cgroup_set_permissions.
+*/
+func CreateGroup(cg Cgroup, ignore_ownership bool) error {
+  var i int = 0
+  if ignore_ownership == true {
+    i = 1
+  }
+  return _err(C.cgroup_create_cgroup(cg.g, C.int(i)))
+}
+
+/*
+Structure describing a controller attached to one struct @c cgroup, including
+parameters of the group and their values. The structure is opaque to
+applications.
+*/
 type Controller struct {
 	c *C.struct_cgroup_controller
 }
 
-/**
- * Initialize libcgroup. Information about mounted hierarchies are examined
- * and cached internally (just what's mounted where, not the groups themselves).
- */
+/*
+Initialize libcgroup. Information about mounted hierarchies are examined
+and cached internally (just what's mounted where, not the groups themselves).
+*/
 func Init() error {
 	return _err(C.cgroup_init())
 }
 
 /*
- * Load configuration file and mount and create control groups described there.
- * See cgconfig.conf man page for format of the file.
- */
+Load configuration file and mount and create control groups described there.
+See cgconfig.conf man page for format of the file.
+*/
 func LoadConfig(filename string) error {
 	return _err(C.cgroup_config_load_config(C.CString(filename)))
 }
 
-/**
- * Delete all control groups and unmount all hierarchies.
- */
+/*
+Delete all control groups and unmount all hierarchies.
+*/
 func Unload() error {
 	return _err(C.cgroup_unload_cgroups())
 }
@@ -82,37 +109,52 @@ func Unload() error {
 type DeleteFlag int
 
 const (
-	/**
-	 * Ignore errors caused by migration of tasks to parent group.
-	 */
+	// Ignore errors caused by migration of tasks to parent group.
 	DeleteIgnoreMigration = DeleteFlag(C.CGFLAG_DELETE_IGNORE_MIGRATION)
 
-	/**
-	 * Recursively delete all child groups.
-	 */
+	// Recursively delete all child groups.
 	DeleteRecursive = DeleteFlag(C.CGFLAG_DELETE_RECURSIVE)
 
-	/**
-	 * Delete the cgroup only if it is empty, i.e. it has no subgroups and
-	 * no processes inside. This flag cannot be used with
-	 * DeleteRecursive
-	 */
+	/*
+		Delete the cgroup only if it is empty, i.e. it has no subgroups and
+		no processes inside. This flag cannot be used with
+		DeleteRecursive
+	*/
 	DeleteEmptyOnly = DeleteFlag(C.CGFLAG_DELETE_EMPTY_ONLY)
 )
 
-/**
- * Delete all cgroups and unmount all mount points defined in specified config
- * file.
- *
- * The groups are either removed recursively or only the empty ones, based
- * on given flags. Mount point are always umounted only if they are empty,
- * regardless of any flags.
- *
- * The groups are sorted before they are removed, so the removal of empty ones
- * actually works (i.e. subgroups are removed first).
- */
+/*
+Delete all cgroups and unmount all mount points defined in specified config
+file.
+
+The groups are either removed recursively or only the empty ones, based
+on given flags. Mount point are always umounted only if they are empty,
+regardless of any flags.
+
+The groups are sorted before they are removed, so the removal of empty ones
+actually works (i.e. subgroups are removed first).
+*/
 func UnloadFromConfig(filename string, flags DeleteFlag) error {
 	return _err(C.cgroup_config_unload_config(C.CString(filename), C.int(flags)))
+}
+
+/*
+Sets default permissions of groups created by subsequent
+cgroup_config_load_config() calls. If a config file contains a 'default {}'
+section, the default permissions from the config file is then used.
+
+Use cgroup_new_cgroup() to create a dummy group and cgroup_set_uid_gid() and
+cgroup_set_permissions() to set its permissions. Use NO_UID_GID instead of
+GID/UID and NO_PERMS instead of file/directory permissions to let kernel
+decide the default permissions where you don't want specific user and/or
+permissions. Kernel then uses current user/group and permissions from umask
+then.
+
+New default permissions from this group are copied to libcgroup internal
+structures.
+*/
+func SetDefault(cg Cgroup) error {
+  return _err(C.cgroup_config_set_default(cg.g))
 }
 
 type FileInfo struct {
@@ -207,8 +249,8 @@ var (
 )
 
 /*
- * Return last errno, which caused ECGOTHER error.
- */
+Return last errno, which caused ECGOTHER error.
+*/
 func LastError() error {
 	return _err(C.cgroup_get_last_errno())
 }
