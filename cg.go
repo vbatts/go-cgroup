@@ -283,6 +283,55 @@ func (c Controller) AddValueString(name, value string) error {
 	return _err(C.cgroup_add_value_string(c.c, C.CString(name), C.CString(value)))
 }
 
+func (c Controller) AddValueInt64(name string, value int64) error {
+	return _err(C.cgroup_add_value_int64(c.c, C.CString(name), C.int64_t(value)))
+}
+
+func (c Controller) AddValueBool(name string, value bool) error {
+	return _err(C.cgroup_add_value_bool(c.c, C.CString(name), C.bool(value)))
+}
+
+/*
+Use Cgroup.Get() to fill these values with data from the kernel
+*/
+func (c Controller) GetValueString(name string) (value string, err error) {
+	var v *C.char
+	err = _err(C.cgroup_get_value_string(c.c, C.CString(name), &v))
+	return C.GoString(v), err
+}
+
+func (c Controller) GetValueInt64(name string) (value int64, err error) {
+	var v C.int64_t
+	err = _err(C.cgroup_get_value_int64(c.c, C.CString(name), &v))
+	return int64(v), err
+}
+
+func (c Controller) GetValueBool(name string) (value bool, err error) {
+	var v C.bool
+	err = _err(C.cgroup_get_value_bool(c.c, C.CString(name), &v))
+	return bool(v), err
+}
+
+/*
+Set a parameter value in @c libcgroup internal structures.
+Use Cgroup.Modify() or Cgroup.Create() to write it to kernel.
+*/
+func (c Controller) SetValueString(name, value string) error {
+	return _err(C.cgroup_set_value_string(c.c, C.CString(name), C.CString(value)))
+}
+
+func (c Controller) SetValueInt64(name string, value int64) error {
+	return _err(C.cgroup_set_value_int64(c.c, C.CString(name), C.int64_t(value)))
+}
+
+func (c Controller) SetValueUint64(name string, value uint64) error {
+	return _err(C.cgroup_set_value_uint64(c.c, C.CString(name), C.u_int64_t(value)))
+}
+
+func (c Controller) SetValueBool(name string, value bool) error {
+	return _err(C.cgroup_set_value_bool(c.c, C.CString(name), C.bool(value)))
+}
+
 /*
 Compare names, parameters and values of two controllers.
 
