@@ -10,6 +10,9 @@ Installing
 	go get github.com/vbatts/go-cgroup
  
 
+on debian, you'll need packages: golang, libcgroup-dev
+on fedora, you'll need packages: golang, libcgroup-devel
+
 Sample
 ======
 
