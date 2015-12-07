@@ -21,7 +21,7 @@ Structure describing one or more control groups. The structure is opaque to
 applications.
 */
 type Cgroup struct {
-	g *C.struct_group
+	g *C.struct_cgroup
 }
 
 func NewCgroup(name string) Cgroup {
@@ -482,12 +482,14 @@ func GetAllControllers() (controllers []ControllerData, err error) {
 	controllers = append(controllers, fromCControllerData(cd))
 	for {
 		err = _err(C.cgroup_get_all_controller_next(&handle, &cd))
-		if err != nil && err != ECGEOF {
+		if err != nil {
+			if err == ECGEOF {
+				break
+			}
+
 			return controllers, err
-		}
-		controllers = append(controllers, fromCControllerData(cd))
-		if err == ECGEOF {
-			break
+		} else {
+			controllers = append(controllers, fromCControllerData(cd))
 		}
 	}
 	return controllers, nil
