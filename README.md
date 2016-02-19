@@ -16,20 +16,28 @@ on fedora, you'll need packages: golang, libcgroup-devel
 Sample
 ======
 
+```
+package main
 
-	cgroup.Init()
+import "github.com/vbatts/go-cgroup"
+import "fmt"
 
-	fmt.Println(cgroup.GetSubSysMountPoint("cpu"))
+func main() {
+  cgroup.Init()
 
-	ctls, err := cgroup.GetAllControllers()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	for i := range ctls {
-		fmt.Println(ctls[i])
-	}
+  fmt.Println(cgroup.GetSubSysMountPoint("cpu"))
 
+  ctls, err := cgroup.GetAllControllers()
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
+  for i := range ctls {
+    fmt.Println(ctls[i])
+  }
+
+}
+```
 
 Contributing
 ============
