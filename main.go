@@ -4,8 +4,9 @@
 package main
 
 import (
-	"."
 	"fmt"
+
+	"github.com/vbatts/go-cgroup"
 )
 
 func main() {
@@ -25,6 +26,6 @@ func main() {
 		return
 	}
 	for i := range ctls {
-		fmt.Printf("Hierarchy=%d Enabled=%d NumCgroups=%d Name=%s\n", ctls[i].Hierarchy, ctls[i].Enabled, ctls[i].NumCgroups, ctls[i].Name)
+		fmt.Printf("Hierarchy=%d Enabled=%d NumCgroups=%d Name=%s\n", ctls[i].Hierarchy(), ctls[i].Enabled(), ctls[i].NumCgroups(), ctls[i].Name())
 	}
 }

@@ -449,22 +449,42 @@ int cgroup_walk_tree_begin(const char *controller, const char *base_path, int de
 				int *base_level);
 */
 
-/*
-Information model for Controllers available
-*/
+// ControllerData is the information model for controllers available
 type ControllerData struct {
-	Name       string
-	Hierarchy  int
-	NumCgroups int
-	Enabled    int
+	name       string
+	hierarchy  int
+	numCgroups int
+	enabled    int
+}
+
+// Name of the this controller
+func (cd ControllerData) Name() string {
+	return cd.name
+}
+
+// Hierarchy is the identification of the controller. Controllers with the same
+// hierarchy ID are mounted together as one hierarchy. Controllers with ID 0
+// are not currently mounted anywhere.
+func (cd ControllerData) Hierarchy() int {
+	return cd.hierarchy
+}
+
+// NumCgroups is the number of cgroups
+func (cd ControllerData) NumCgroups() int {
+	return cd.numCgroups
+}
+
+// Enabled indicates whether or not this controller is enabled
+func (cd ControllerData) Enabled() int {
+	return cd.enabled
 }
 
 func fromCControllerData(cData C.struct_controller_data) ControllerData {
 	return ControllerData{
-		Name:       C.GoString(&cData.name[0]),
-		Hierarchy:  int(cData.hierarchy),
-		NumCgroups: int(cData.num_cgroups),
-		Enabled:    int(cData.enabled),
+		name:       C.GoString(&cData.name[0]),
+		hierarchy:  int(cData.hierarchy),
+		numCgroups: int(cData.num_cgroups),
+		enabled:    int(cData.enabled),
 	}
 }
 
