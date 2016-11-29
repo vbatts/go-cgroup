@@ -16,10 +16,8 @@ import (
 	"unsafe"
 )
 
-/*
-Structure describing one or more control groups. The structure is opaque to
-applications.
-*/
+// Cgroup is the structure describing one or more control groups. The structure
+// is opaque to applications.
 type Cgroup struct {
 	g *C.struct_cgroup
 }
@@ -117,7 +115,7 @@ func (cg Cgroup) Modify() error {
 }
 
 /*
-Physically remove a control group from kernel. The group is removed from
+Delete removes a control group from kernel. The group is removed from
 all hierarchies,  which cover controllers added by Cgroup.AddController()
 or GetCgroup(). All tasks inside the group are automatically moved
 to parent group.
@@ -132,14 +130,14 @@ func (cg Cgroup) Delete() error {
 }
 
 /*
-Same as Delete(), but ignores errors when migrating.
+DeleteIgnoreMigration is the same as Delete(), but ignores errors when migrating.
 */
 func (cg Cgroup) DeleteIgnoreMigration() error {
 	return _err(C.cgroup_delete_cgroup(cg.g, C.int(1)))
 }
 
 /*
-Physically remove a control group from kernel.
+DeleteExt removes a control group from kernel.
 All tasks are automatically moved to parent group.
 If DeleteIgnoreMigration flag is used, the errors that occurred
 during the task movement are ignored.
@@ -152,7 +150,7 @@ func (cg Cgroup) DeleteExt(flags DeleteFlag) error {
 }
 
 /*
-Read all information regarding the group from kernel.
+Get reads all information regarding the group from kernel.
 Based on name of the group, list of controllers and all parameters and their
 values are read from all hierarchies, where a group with given name exists.
 All existing controllers are replaced. I.e. following code will fill root with
@@ -168,48 +166,48 @@ func (cg Cgroup) Get() error {
 	return _err(C.cgroup_get_cgroup(cg.g))
 }
 
-type UID C.uid_t
-type GID C.gid_t
+type (
+	UID C.uid_t
+	GID C.gid_t
+)
 
 /*
-Set owner of the group control files and the @c tasks file. This function
+SetUIDGID sets owner of the group control files and the @c tasks file. This function
 modifies only libcgroup internal cgroup structure, use
 Cgroup.Create() afterwards to create the group with given owners.
 
 @param cgroup
-@param tasks_uid UID of the owner of group's @c tasks file.
-@param tasks_gid GID of the owner of group's @c tasks file.
-@param control_uid UID of the owner of group's control files (i.e.
+@param tasksUID UID of the owner of group's @c tasks file.
+@param tasksGID GID of the owner of group's @c tasks file.
+@param controlUID UID of the owner of group's control files (i.e.
 parameters).
-@param control_gid GID of the owner of group's control files (i.e.
+@param controlGID GID of the owner of group's control files (i.e.
 parameters).
 */
-func (cg Cgroup) SetUidGid(tasks_uid UID, tasks_gid GID,
-	control_uid UID, control_gid GID) error {
+func (cg Cgroup) SetUIDGID(tasksUID UID, tasksGID GID,
+	controlUID UID, controlGID GID) error {
 	return _err(C.cgroup_set_uid_gid(cg.g,
-		C.uid_t(tasks_uid), C.gid_t(tasks_gid),
-		C.uid_t(control_uid), C.gid_t(control_gid)))
+		C.uid_t(tasksUID), C.gid_t(tasksGID),
+		C.uid_t(controlUID), C.gid_t(controlGID)))
 
 }
 
-/*
-Return owners of the group's @c tasks file and control files.
-The data is read from libcgroup internal cgroup structure, use
-Cgroup.SetUidGid() or Cgroup.Get() to fill it.
-*/
-func (cg Cgroup) GetUidGid() (tasks_uid UID, tasks_gid GID, control_uid UID, control_gid GID, err error) {
+// GetUIDGID returns owners of the group's @c tasks file and control files.
+// The data is read from libcgroup internal cgroup structure, use
+// Cgroup.SetUIDGID() or Cgroup.Get() to fill it.
+func (cg Cgroup) GetUIDGID() (tasksUID UID, tasksGID GID, controlUID UID, controlGID GID, err error) {
 	var (
-		c_t_u C.uid_t
-		c_t_g C.gid_t
-		c_c_u C.uid_t
-		c_c_g C.gid_t
+		cTU C.uid_t
+		cTG C.gid_t
+		cCU C.uid_t
+		cCG C.gid_t
 	)
 	err = _err(C.cgroup_set_uid_gid(cg.g,
-		c_t_u,
-		c_t_g,
-		c_c_u,
-		c_c_g))
-	return UID(c_t_u), GID(c_t_g), UID(c_c_u), GID(c_c_g), err
+		cTU,
+		cTG,
+		cCU,
+		cCG))
+	return UID(cTU), GID(cTG), UID(cCU), GID(cCG), err
 
 }
 
@@ -224,7 +222,7 @@ const (
 type Mode C.mode_t
 
 /*
-Stores given file permissions of the group's control and tasks files
+SetPermissions stores given file permissions of the group's control and tasks files
 into the cgroup data structure. Use NO_PERMS if permissions shouldn't
 be changed or a value which applicable to chmod(2). Please note that
 the given permissions are masked with the file owner's permissions.
@@ -243,42 +241,33 @@ func (cg Cgroup) SetPermissions(control_dperm, control_fperm, task_fperm Mode) {
 		C.mode_t(control_fperm), C.mode_t(task_fperm))
 }
 
-/*
-Copy all controllers, parameters and their values. All existing controllers
-in the source group are discarded.
-*/
+// CopyCgroup copies all controllers, parameters and their values. All existing
+// controllers in the source group are discarded.
 func CopyCgroup(src, dest Cgroup) error {
 	return _err(C.cgroup_copy_cgroup(src.g, dest.g))
 }
 
-/*
-Compare names, owners, controllers, parameters and values of two groups.
-
-Return value of:
- * nil - a and b are equal
- * ECGROUPNOTEQUAL - groups are not equal
- * ECGCONTROLLERNOTEQUAL - controllers are not equal
-
-*/
+// CompareCgroup compares names, owners, controllers, parameters and values of two groups.
+//
+// Return value of:
+//   * nil - a and b are equal
+//   * ErrGroupNotEqual - groups are not equal
+//   * ErrControllerNotEqual - controllers are not equal
 func CompareCgroup(a, b Cgroup) error {
 	return _err(C.cgroup_compare_cgroup(a.g, b.g))
 }
 
-/*
-Structure describing a controller attached to one struct @c cgroup, including
-parameters of the group and their values. The structure is opaque to
-applications.
-*/
+// Controller is the structure describing a controller attached to one struct
+// @c cgroup, including parameters of the group and their values. The structure
+// is opaque to applications.
 type Controller struct {
 	c *C.struct_cgroup_controller
 }
 
-/*
-Add parameter and its value to internal libcgroup structures.
-Use Cgroup.Modify() or Cgroup.Create() to write it to kernel.
-
-Name of the parameter and its value
-*/
+// AddValueString adds parameter and its value to internal libcgroup
+// structures.  Use Cgroup.Modify() or Cgroup.Create() to write it to kernel.
+//
+// Name of the parameter and its value
 func (c Controller) AddValueString(name, value string) error {
 	return _err(C.cgroup_add_value_string(c.c, C.CString(name), C.CString(value)))
 }
@@ -291,9 +280,8 @@ func (c Controller) AddValueBool(name string, value bool) error {
 	return _err(C.cgroup_add_value_bool(c.c, C.CString(name), C.bool(value)))
 }
 
-/*
-Use Cgroup.Get() to fill these values with data from the kernel
-*/
+// GetValueString fetches the values from the controller.  Use Cgroup.Get() to
+// get the names available to fetch values from the kernel.
 func (c Controller) GetValueString(name string) (value string, err error) {
 	var v *C.char
 	err = _err(C.cgroup_get_value_string(c.c, C.CString(name), &v))
@@ -333,35 +321,30 @@ func (c Controller) SetValueBool(name string, value bool) error {
 }
 
 /*
-Compare names, parameters and values of two controllers.
+CompareControllers compares names, parameters and values of two controllers.
 
 Return value of:
  * nil - a and b are equal
- * ECGCONTROLLERNOTEQUAL - controllers are not equal
+ * ErrControllerNotEqual - controllers are not equal
 */
 func CompareControllers(a, b Controller) error {
 	return _err(C.cgroup_compare_controllers(a.c, b.c))
 }
 
-/*
-Initialize libcgroup. Information about mounted hierarchies are examined
-and cached internally (just what's mounted where, not the groups themselves).
-*/
+// Init initializes libcgroup. Information about mounted hierarchies are
+// examined and cached internally (just what's mounted where, not the groups
+// themselves).
 func Init() error {
 	return _err(C.cgroup_init())
 }
 
-/*
-Load configuration file and mount and create control groups described there.
-See cgconfig.conf man page for format of the file.
-*/
+// LoadConfig file and mount and create control groups described there.
+// See cgconfig.conf(5) man page for format of the file.
 func LoadConfig(filename string) error {
 	return _err(C.cgroup_config_load_config(C.CString(filename)))
 }
 
-/*
-Delete all control groups and unmount all hierarchies.
-*/
+// Unload deletes all control groups and unmount all hierarchies.
 func Unload() error {
 	return _err(C.cgroup_unload_cgroups())
 }
@@ -369,27 +352,25 @@ func Unload() error {
 type DeleteFlag int
 
 const (
-	// Ignore errors caused by migration of tasks to parent group.
+	// DeleteIgnoreMigration ignore errors caused by migration of tasks to parent group.
 	DeleteIgnoreMigration = DeleteFlag(C.CGFLAG_DELETE_IGNORE_MIGRATION)
 
-	// Recursively delete all child groups.
+	// DeleteRecursive recursively delete all child groups.
 	DeleteRecursive = DeleteFlag(C.CGFLAG_DELETE_RECURSIVE)
 
-	/*
-		Delete the cgroup only if it is empty, i.e. it has no subgroups and
-		no processes inside. This flag cannot be used with
-		DeleteRecursive
-	*/
+	// DeleteEmptyOnly deletes the cgroup only if it is empty, i.e. it has no
+	// subgroups and no processes inside. This flag cannot be used with
+	// DeleteRecursive
 	DeleteEmptyOnly = DeleteFlag(C.CGFLAG_DELETE_EMPTY_ONLY)
 )
 
 /*
-Delete all cgroups and unmount all mount points defined in specified config
-file.
+UnloadFromConfig deletes all cgroups and unmount all mount points defined in
+specified config file.
 
-The groups are either removed recursively or only the empty ones, based
-on given flags. Mount point are always umounted only if they are empty,
-regardless of any flags.
+The groups are either removed recursively or only the empty ones, based on
+given flags. Mount point are always umounted only if they are empty, regardless
+of any flags.
 
 The groups are sorted before they are removed, so the removal of empty ones
 actually works (i.e. subgroups are removed first).
@@ -399,7 +380,7 @@ func UnloadFromConfig(filename string, flags DeleteFlag) error {
 }
 
 /*
-Sets default permissions of groups created by subsequent
+SetDefault permissions of groups created by subsequent
 cgroup_config_load_config() calls. If a config file contains a 'default {}'
 section, the default permissions from the config file is then used.
 
@@ -417,21 +398,47 @@ func SetDefault(cg Cgroup) error {
 	return _err(C.cgroup_config_set_default(cg.g))
 }
 
+// FileInfo is the Information about found cgroup directory (= a control group).
 type FileInfo struct {
-	Type     FileType
-	Path     string
-	Parent   string
-	FullPath string
-	Depth    int8
+	fileType FileType
+	path     string
+	parent   string
+	fullPath string
+	depth    int8
+}
+
+// FileType of this cgroup's
+func (fi FileInfo) FileType() FileType {
+	return fi.fileType
+}
+
+// Path to this cgroup
+func (fi FileInfo) Path() string {
+	return fi.path
+}
+
+// Parent of this cgroup
+func (fi FileInfo) Parent() string {
+	return fi.parent
+}
+
+// FullPath to this cgroup
+func (fi FileInfo) FullPath() string {
+	return fi.fullPath
+}
+
+// Depth of this cgroup
+func (fi FileInfo) Depth() int8 {
+	return fi.depth
 }
 
 func fromCFileInfo(cData C.struct_cgroup_file_info) FileInfo {
 	return FileInfo{
-		Type:     FileType(C.type_from_file_info(cData)),
-		Path:     C.GoString(cData.path),
-		Parent:   C.GoString(cData.parent),
-		FullPath: C.GoString(cData.full_path),
-		Depth:    int8(cData.depth),
+		fileType: FileType(C.type_from_file_info(cData)),
+		path:     C.GoString(cData.path),
+		parent:   C.GoString(cData.parent),
+		fullPath: C.GoString(cData.full_path),
+		depth:    int8(cData.depth),
 	}
 }
 
@@ -503,7 +510,7 @@ func GetAllControllers() (controllers []ControllerData, err error) {
 	for {
 		err = _err(C.cgroup_get_all_controller_next(&handle, &cd))
 		if err != nil {
-			if err == ECGEOF {
+			if err == ErrEOF {
 				break
 			}
 
@@ -524,17 +531,15 @@ func GetSubSysMountPoint(controller string) (string, error) {
 	return C.GoString(mp), nil
 }
 
+// Various errors
 var (
-	// End-of-file for iterators
-	ECGEOF                = errors.New(C.GoString(C.cgroup_strerror(C.ECGEOF)))
-	ECGOTHER              = errors.New(C.GoString(C.cgroup_strerror(C.ECGOTHER)))
-	ECGROUPNOTEQUAL       = errors.New(C.GoString(C.cgroup_strerror(C.ECGROUPNOTEQUAL)))
-	ECGCONTROLLERNOTEQUAL = errors.New(C.GoString(C.cgroup_strerror(C.ECGCONTROLLERNOTEQUAL)))
+	ErrEOF                = errors.New(C.GoString(C.cgroup_strerror(C.ECGEOF)))
+	ErrOTHER              = errors.New(C.GoString(C.cgroup_strerror(C.ECGOTHER)))
+	ErrGroupNotEqual      = errors.New(C.GoString(C.cgroup_strerror(C.ECGROUPNOTEQUAL)))
+	ErrControllerNotEqual = errors.New(C.GoString(C.cgroup_strerror(C.ECGCONTROLLERNOTEQUAL)))
 )
 
-/*
-Return last errno, which caused ECGOTHER error.
-*/
+// LastError returns last errno, which caused ErrOTHER error.
 func LastError() error {
 	return _err(C.cgroup_get_last_errno())
 }
@@ -544,13 +549,13 @@ func _err(num C.int) error {
 	case 0:
 		return nil
 	case C.ECGEOF:
-		return ECGEOF
+		return ErrEOF
 	case C.ECGOTHER:
-		return ECGOTHER
+		return ErrOTHER
 	case C.ECGROUPNOTEQUAL:
-		return ECGROUPNOTEQUAL
+		return ErrGroupNotEqual
 	case C.ECGCONTROLLERNOTEQUAL:
-		return ECGCONTROLLERNOTEQUAL
+		return ErrControllerNotEqual
 	}
 	// There's a lot. We'll create them as they come
 	return errors.New(C.GoString(C.cgroup_strerror(num)))
