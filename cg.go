@@ -16,12 +16,26 @@ import (
 	"unsafe"
 )
 
+// Init initializes libcgroup. Information about mounted hierarchies are
+// examined and cached internally (just what's mounted where, not the groups
+// themselves).
+func Init() error {
+	return _err(C.cgroup_init())
+}
+
 // Cgroup is the structure describing one or more control groups. The structure
 // is opaque to applications.
 type Cgroup struct {
 	g *C.struct_cgroup
 }
 
+// NewCgroup allocates a new cgroup structure. This function itself does not create new
+// control group in kernel, only new <tt>struct cgroup</tt> inside libcgroup!
+// The caller would still need to Create() or similar to create this group in the kernel.
+//
+// @param name Path to the group, relative from root group. Use @c "/" or @c "."
+// 	for the root group itself and @c "/foo/bar/baz" or @c "foo/bar/baz" for
+// 	subgroups.
 func NewCgroup(name string) Cgroup {
 	cg := Cgroup{
 		C.cgroup_new_cgroup(C.CString(name)),
@@ -30,33 +44,30 @@ func NewCgroup(name string) Cgroup {
 	return cg
 }
 
-func (cg *Cgroup) AddController(name string) Controller {
-	return Controller{
+// AddController attaches a new controller to cgroup. This function just
+// modifies internal libcgroup structure, not the kernel control group.
+func (cg *Cgroup) AddController(name string) *Controller {
+	return &Controller{
 		C.cgroup_add_controller(cg.g, C.CString(name)),
 	}
 }
-func (cg Cgroup) GetController(name string) Controller {
-	return Controller{
+
+// GetController returns appropriate controller from given group.
+// The controller must be added before using AddController() or loaded
+// from kernel using GetCgroup().
+func (cg Cgroup) GetController(name string) *Controller {
+	return &Controller{
 		C.cgroup_get_controller(cg.g, C.CString(name)),
 	}
 }
 
 func freeCgroupThings(cg *Cgroup) {
-
-	freeCgroup(*cg)
-	freeControllers(*cg)
-}
-
-func freeCgroup(cg Cgroup) {
 	C.cgroup_free(&cg.g)
-}
-
-func freeControllers(cg Cgroup) {
 	C.cgroup_free_controllers(cg.g)
 }
 
 /*
-Physically create a control group in kernel. The group is created in all
+Create a control group in kernel. The group is created in all
 hierarchies, which cover controllers added by Cgroup.AddController().
 
 TODO correct docs for golang implementation
@@ -67,24 +78,21 @@ permissions set by cgroup_set_permissions.
 
   foo = cgroup.NewCgroup("foo)
   foo.Create()
-
 */
 func (cg Cgroup) Create() error {
 	return _err(C.cgroup_create_cgroup(cg.g, C.int(0)))
 }
 
-/*
-Same as Create(), but all errors are ignored when setting
-owner of the group and/or its tasks file.
-*/
+// CreateIgnoreOwnership is the same as Create(), but all errors are ignored
+// when setting owner of the group and/or its tasks file.
 func (cg Cgroup) CreateIgnoreOwnership() error {
 	return _err(C.cgroup_create_cgroup(cg.g, C.int(1)))
 }
 
 /*
-Physically create new control group in kernel, with all parameters and values
-copied from its parent group. The group is created in all hierarchies, where
-the parent group exists. I.e. following code creates subgroup in all
+CreateFromParent creates new control group in kernel, with all parameters and
+values copied from its parent group. The group is created in all hierarchies,
+where the parent group exists. I.e. following code creates subgroup in all
 hierarchies, because all of them have root (=parent) group.
 
   foo = cgroup.NewCgroup("foo)
@@ -95,21 +103,17 @@ func (cg Cgroup) CreateFromParent() error {
 	return _err(C.cgroup_create_cgroup_from_parent(cg.g, C.int(0)))
 }
 
-/*
-Same as CreateFromParent(), but all errors are ignored when setting
-owner of the group and/or its tasks file.
-*/
+// CreateFromParentIgnoreOwnership is the same as CreateFromParent(), but all
+// errors are ignored when setting owner of the group and/or its tasks file.
 func (cg Cgroup) CreateFromParentIgnoreOwnership() error {
 	return _err(C.cgroup_create_cgroup_from_parent(cg.g, C.int(1)))
 }
 
-/*
-Physically modify a control group in kernel. All parameters added by
-cgroup_add_value_ or cgroup_set_value_ are written.
-Currently it's not possible to change and owner of a group.
-
-TODO correct docs for golang implementation
-*/
+// Modify a control group in kernel. All parameters added by cgroup_add_value_
+// or cgroup_set_value_ are written.  Currently it's not possible to change and
+// owner of a group.
+//
+// TODO correct docs for golang implementation
 func (cg Cgroup) Modify() error {
 	return _err(C.cgroup_modify_cgroup(cg.g))
 }
@@ -129,18 +133,19 @@ func (cg Cgroup) Delete() error {
 	return _err(C.cgroup_delete_cgroup(cg.g, C.int(0)))
 }
 
-/*
-DeleteIgnoreMigration is the same as Delete(), but ignores errors when migrating.
-*/
+// DeleteIgnoreMigration is the same as Delete(), but ignores errors when
+// migrating.
 func (cg Cgroup) DeleteIgnoreMigration() error {
 	return _err(C.cgroup_delete_cgroup(cg.g, C.int(1)))
 }
 
 /*
 DeleteExt removes a control group from kernel.
+
 All tasks are automatically moved to parent group.
 If DeleteIgnoreMigration flag is used, the errors that occurred
 during the task movement are ignored.
+
 DeleteRecursive flag specifies that all subgroups should be removed
 too. If root group is being removed with this flag specified, all subgroups
 are removed but the root group itself is left undeleted.
@@ -167,7 +172,12 @@ func (cg Cgroup) Get() error {
 }
 
 type (
+	// UID is the user ID type.
+	//  cgroup.UID(0)
 	UID C.uid_t
+
+	// GID is the group ID type.
+	//  cgroup.GID(0)
 	GID C.gid_t
 )
 
@@ -212,33 +222,34 @@ func (cg Cgroup) GetUIDGID() (tasksUID UID, tasksGID GID, controlUID UID, contro
 }
 
 const (
-	// Uninitialized file/directory permissions used for task/control files.
-	NO_PERMS = C.NO_PERMS
+	// NoPerms is uninitialized file/directory permissions used for task/control files.
+	NoPerms = C.NO_PERMS
 
-	// Uninitialized UID/GID used for task/control files.
-	NO_UID_GID = C.NO_UID_GID
+	// NoUIDGID is uninitialized UID/GID used for task/control files.
+	NoUIDGID = C.NO_UID_GID
 )
 
+// Mode is the file permissions. Like used in SetPermissions()
 type Mode C.mode_t
 
 /*
 SetPermissions stores given file permissions of the group's control and tasks files
-into the cgroup data structure. Use NO_PERMS if permissions shouldn't
+into the cgroup data structure. Use NoPerms if permissions shouldn't
 be changed or a value which applicable to chmod(2). Please note that
 the given permissions are masked with the file owner's permissions.
-For example if a control file has permissions 640 and control_fperm is
+For example if a control file has permissions 640 and controlFilePerm is
 471 the result will be 460.
 
-control_dperm Directory permission for the group.
-control_fperm File permission for the control files.
-task_fperm File permissions for task file.
+controlDirPerm Directory permission for the group.
+controlFilePerm File permission for the control files.
+taskFilePerm File permissions for task file.
 
   g := cgroup.NewCgroup("foo")
   g.SetPermissions(cgroup.Mode(0777), cgroup.Mode(0777), cgroup.Mode(0777))
 */
-func (cg Cgroup) SetPermissions(control_dperm, control_fperm, task_fperm Mode) {
-	C.cgroup_set_permissions(cg.g, C.mode_t(control_dperm),
-		C.mode_t(control_fperm), C.mode_t(task_fperm))
+func (cg Cgroup) SetPermissions(controlDirPerm, controlFilePerm, taskFilePerm Mode) {
+	C.cgroup_set_permissions(cg.g, C.mode_t(controlDirPerm),
+		C.mode_t(controlFilePerm), C.mode_t(taskFilePerm))
 }
 
 // CopyCgroup copies all controllers, parameters and their values. All existing
@@ -300,10 +311,8 @@ func (c Controller) GetValueBool(name string) (value bool, err error) {
 	return bool(v), err
 }
 
-/*
-Set a parameter value in @c libcgroup internal structures.
-Use Cgroup.Modify() or Cgroup.Create() to write it to kernel.
-*/
+// SetValueString sets a parameter value in @c libcgroup internal structures.
+// Use Cgroup.Modify() or Cgroup.Create() to write it to kernel.
 func (c Controller) SetValueString(name, value string) error {
 	return _err(C.cgroup_set_value_string(c.c, C.CString(name), C.CString(value)))
 }
@@ -329,13 +338,6 @@ Return value of:
 */
 func CompareControllers(a, b Controller) error {
 	return _err(C.cgroup_compare_controllers(a.c, b.c))
-}
-
-// Init initializes libcgroup. Information about mounted hierarchies are
-// examined and cached internally (just what's mounted where, not the groups
-// themselves).
-func Init() error {
-	return _err(C.cgroup_init())
 }
 
 // LoadConfig file and mount and create control groups described there.
@@ -385,8 +387,8 @@ cgroup_config_load_config() calls. If a config file contains a 'default {}'
 section, the default permissions from the config file is then used.
 
 Use cgroup_new_cgroup() to create a dummy group and cgroup_set_uid_gid() and
-cgroup_set_permissions() to set its permissions. Use NO_UID_GID instead of
-GID/UID and NO_PERMS instead of file/directory permissions to let kernel
+cgroup_set_permissions() to set its permissions. Use NoUIDGID instead of
+GID/UID and NoPerms instead of file/directory permissions to let kernel
 decide the default permissions where you don't want specific user and/or
 permissions. Kernel then uses current user/group and permissions from umask
 then.
@@ -515,9 +517,8 @@ func GetAllControllers() (controllers []ControllerData, err error) {
 			}
 
 			return controllers, err
-		} else {
-			controllers = append(controllers, fromCControllerData(cd))
 		}
+		controllers = append(controllers, fromCControllerData(cd))
 	}
 	return controllers, nil
 }
