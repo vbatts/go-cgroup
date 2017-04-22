@@ -221,6 +221,14 @@ func (cg Cgroup) GetUIDGID() (tasksUID UID, tasksGID GID, controlUID UID, contro
 
 }
 
+type (
+	PID C.pid_t
+)
+
+func (cg Cgroup) AttachTaskPid(pid PID) error {
+	return _err(C.cgroup_attach_task_pid(cg.g, pid))
+}
+
 const (
 	// NoPerms is uninitialized file/directory permissions used for task/control files.
 	NoPerms = C.NO_PERMS
