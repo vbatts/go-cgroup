@@ -212,11 +212,11 @@ func (cg Cgroup) GetUIDGID() (tasksUID UID, tasksGID GID, controlUID UID, contro
 		cCU C.uid_t
 		cCG C.gid_t
 	)
-	err = _err(C.cgroup_set_uid_gid(cg.g,
-		cTU,
-		cTG,
-		cCU,
-		cCG))
+	err = _err(C.cgroup_get_uid_gid(cg.g,
+		&cTU,
+		&cTG,
+		&cCU,
+		&cCG))
 	return UID(cTU), GID(cTG), UID(cCU), GID(cCG), err
 
 }
