@@ -13,6 +13,7 @@ import "C"
 import (
 	"errors"
 	"runtime"
+	"strconv"
 	"unsafe"
 )
 
@@ -560,4 +561,23 @@ func _err(num C.int) error {
 	}
 	// There's a lot. We'll create them as they come
 	return errors.New(C.GoString(C.cgroup_strerror(num)))
+}
+
+// simple helpers to get UID or GID from a given string
+func stringToUID(uidStr string) UID {
+	intVal, err := strconv.Atoi(uidStr)
+	if err != nil {
+		return UID(0)
+	}
+
+	return UID(intVal)
+}
+
+func stringToGID(gidStr string) GID {
+	intVal, err := strconv.Atoi(gidStr)
+	if err != nil {
+		return GID(0)
+	}
+
+	return GID(intVal)
 }
