@@ -1,22 +1,23 @@
-go-cgroup
-=========
+# go-cgroup
 
 Bindings to the libcgroup library
 
+## Notice
 
-Installing
-==========
+_these bindings are incomplete_
 
-	go get github.com/vbatts/go-cgroup
- 
+## Installing
+
+```shell
+go get github.com/vbatts/go-cgroup
+```
 
 on debian, you'll need packages: golang, libcgroup-dev
 on fedora, you'll need packages: golang, libcgroup-devel
 
-Sample
-======
+## Sample
 
-```
+```golang
 package main
 
 import "github.com/vbatts/go-cgroup"
@@ -39,7 +40,7 @@ func main() {
 }
 ```
 
-Contributing
-============
+## Contributing
+
 Fork and Pull Request please!
 
